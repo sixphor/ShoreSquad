@@ -306,6 +306,14 @@ const UIModule = {
                 alert('Welcome to ShoreSquad! 🌊 Create your account to get started.');
             });
         }
+
+        // Map registration button
+        const mapRegisterBtn = document.querySelector('.map-info .btn-primary');
+        if (mapRegisterBtn) {
+            mapRegisterBtn.addEventListener('click', () => {
+                alert('🎉 You\'ve registered for the Pasir Ris cleanup on January 4, 2025! See you at 9:00 AM. 🌊');
+            });
+        }
     },
 
     setupSmoothScroll() {

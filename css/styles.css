@@ -279,13 +279,30 @@ a:hover {
     background-color: var(--bg-white);
     border: 2px dashed var(--border-color);
     border-radius: var(--radius-lg);
-    height: 400px;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    font-size: 1.1rem;
+    flex-direction: column;
     box-shadow: var(--shadow-md);
+}
+
+.map-placeholder iframe {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.map-info {
+    padding: var(--spacing-lg);
+    background-color: var(--bg-white);
+    border-top: 1px solid var(--border-color);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.map-info h4 {
+    color: var(--primary);
+    margin-bottom: var(--spacing-md);
+}
+
+.map-info p {
+    margin-bottom: var(--spacing-sm);
+    font-size: 0.95rem;
 }
 
 /* ============================================

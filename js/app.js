@@ -10,7 +10,8 @@
 
 const CONFIG = {
     API: {
-        weather: 'https://api.open-meteo.com/v1/forecast', // Free weather API
+        weather: 'https://api.data.gov.sg/v1/environment/2-hour-weather-forecast', // NEA 2-hour forecast
+        weatherFull: 'https://api.data.gov.sg/v1/environment/4-day-weather-forecast', // NEA 4-day forecast
         timeout: 5000,
     },
     cache: {
@@ -95,10 +96,10 @@ const CacheManager = {
 
 const WeatherModule = {
     /**
-     * Fetch weather for a given location
+     * Fetch 4-day weather forecast from NEA
      */
-    async fetchWeather(latitude, longitude) {
-        const cacheKey = `weather_${latitude}_${longitude}`;
+    async fetchWeather() {
+        const cacheKey = 'weather_forecast_nea';
         const cached = CacheManager.get(cacheKey);
 
         if (cached) {
@@ -107,15 +108,7 @@ const WeatherModule = {
         }
 
         try {
-            const params = new URLSearchParams({
-                latitude,
-                longitude,
-                current: 'temperature_2m,weather_code,wind_speed_10m',
-                daily: 'weather_code,temperature_2m_max,temperature_2m_min',
-                timezone: 'auto',
-            });
-
-            const response = await fetch(`${CONFIG.API.weather}?${params}`, {
+            const response = await fetch(CONFIG.API.weatherFull, {
                 signal: AbortSignal.timeout(CONFIG.API.timeout),
             });
 
@@ -131,29 +124,63 @@ const WeatherModule = {
     },
 
     /**
-     * Interpret weather code
+     * Fetch 2-hour forecast from NEA
      */
-    getWeatherDescription(code) {
-        const weatherCodes = {
-            0: '☀️ Clear',
-            1: '⛅ Partly Cloudy',
-            2: '☁️ Cloudy',
-            3: '☁️ Overcast',
-            45: '🌫️ Foggy',
-            48: '🌫️ Frosting Fog',
-            51: '🌧️ Light Rain',
-            61: '🌧️ Moderate Rain',
-            80: '⛈️ Showers',
-            95: '⛈️ Thunderstorm',
-        };
-        return weatherCodes[code] || '❓ Unknown';
+    async fetch2HourForecast() {
+        const cacheKey = 'weather_2hour_nea';
+        const cached = CacheManager.get(cacheKey);
+
+        if (cached) {
+            return cached;
+        }
+
+        try {
+            const response = await fetch(CONFIG.API.weather, {
+                signal: AbortSignal.timeout(CONFIG.API.timeout),
+            });
+
+            if (!response.ok) throw new Error('2-hour forecast API error');
+
+            const data = await response.json();
+            CacheManager.set(cacheKey, data);
+            return data;
+        } catch (error) {
+            console.error('2-hour forecast fetch failed:', error);
+            return null;
+        }
     },
 
     /**
-     * Display weather cards
+     * Get weather emoji/icon based on forecast text
      */
-    displayWeather(data, location = 'Your Location') {
-        if (!data) {
+    getWeatherEmoji(forecastText) {
+        const text = forecastText.toLowerCase();
+        if (text.includes('rain') || text.includes('thunderstorm')) return '🌧️';
+        if (text.includes('cloudy')) return '☁️';
+        if (text.includes('clear') || text.includes('sunny')) return '☀️';
+        if (text.includes('partly')) return '⛅';
+        if (text.includes('fog')) return '🌫️';
+        if (text.includes('showers')) return '⛈️';
+        return '🌤️';
+    },
+
+    /**
+     * Format date for display
+     */
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-SG', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+        });
+    },
+
+    /**
+     * Display 4-day forecast
+     */
+    displayWeather(data) {
+        if (!data || !data.items) {
             document.getElementById('weatherContainer').innerHTML = `
                 <div class="weather-card" style="grid-column: 1/-1;">
                     <p>Unable to fetch weather data. Please check your connection.</p>
@@ -162,27 +189,73 @@ const WeatherModule = {
             return;
         }
 
-        const { current, daily } = data;
-        const weatherHTML = `
-            <div class="weather-card">
-                <h5>${location}</h5>
-                <p style="font-size: 1.5rem; margin: 0.5rem 0;">
-                    ${this.getWeatherDescription(current.weather_code)}
+        const forecastItems = data.items[0].forecast;
+        
+        // Group forecasts by date
+        const forecastByDate = {};
+        forecastItems.forEach((forecast) => {
+            const date = forecast.date;
+            if (!forecastByDate[date]) {
+                forecastByDate[date] = [];
+            }
+            forecastByDate[date].push(forecast);
+        });
+
+        // Create weather cards for first 4 days
+        const dates = Object.keys(forecastByDate).slice(0, 4);
+        const weatherHTML = dates
+            .map((date, index) => {
+                const dayForecasts = forecastByDate[date];
+                // Get average conditions and find min/max temps
+                const forecasts = dayForecasts.map((f) => f.forecast).join(', ');
+                const hasRain = forecasts.toLowerCase().includes('rain');
+                const conditions = new Set(dayForecasts.map((f) => f.forecast));
+                const primaryCondition = Array.from(conditions)[0] || 'Fair';
+                const emoji = this.getWeatherEmoji(primaryCondition);
+
+                return `
+                    <div class="weather-card">
+                        <h5>${this.formatDate(date)}</h5>
+                        <p style="font-size: 1.5rem; margin: 0.5rem 0;">
+                            ${emoji} ${primaryCondition}
+                        </p>
+                        <p><strong>Conditions:</strong> ${Array.from(conditions).join(', ')}</p>
+                        <p style="font-size: 0.9rem; color: #A0AEC0;">
+                            ${hasRain ? '⚠️ Bring rain gear' : '✅ Good cleanup weather'}
+                        </p>
+                    </div>
+                `;
+            })
+            .join('');
+
+        document.getElementById('weatherContainer').innerHTML = weatherHTML;
+    },
+
+    /**
+     * Display 2-hour forecast as current conditions
+     */
+    displayCurrentWeather(data) {
+        if (!data || !data.items) {
+            return;
+        }
+
+        const current = data.items[0];
+        const forecast = current.forecasts[0]?.forecast || 'Fair';
+        const emoji = this.getWeatherEmoji(forecast);
+
+        const currentHTML = `
+            <div class="weather-card" style="grid-column: 1/-1; background: linear-gradient(135deg, #00D4AA 0%, #0099CC 100%); color: white;">
+                <h5>Current Conditions (Next 2 Hours)</h5>
+                <p style="font-size: 1.8rem; margin: 0.5rem 0;">
+                    ${emoji} ${forecast}
                 </p>
-                <p><strong>Temperature:</strong> ${current.temperature_2m}°C</p>
-                <p><strong>Wind Speed:</strong> ${current.wind_speed_10m} km/h</p>
-            </div>
-            <div class="weather-card">
-                <h5>7-Day Forecast</h5>
-                <p><strong>Max:</strong> ${daily.temperature_2m_max[0]}°C</p>
-                <p><strong>Min:</strong> ${daily.temperature_2m_min[0]}°C</p>
-                <p style="font-size: 0.9rem; color: #A0AEC0;">
-                    Good beach cleanup weather? ${current.temperature_2m > 15 ? '✅ Yes!' : '⚠️ Bundle up!'}
-                </p>
+                <p><strong>Last Updated:</strong> ${new Date(current.update_timestamp).toLocaleTimeString('en-SG')}</p>
             </div>
         `;
 
-        document.getElementById('weatherContainer').innerHTML = weatherHTML;
+        // Insert at the beginning of weather container
+        const container = document.getElementById('weatherContainer');
+        container.innerHTML = currentHTML + container.innerHTML;
     },
 };
 
@@ -194,7 +267,9 @@ const GeolocationModule = {
     async getCurrentLocation() {
         return new Promise((resolve, reject) => {
             if (!navigator.geolocation) {
-                reject(new Error('Geolocation not supported'));
+                console.warn('Geolocation not supported, using default location');
+                // Pasir Ris as default
+                resolve({ latitude: 1.381497, longitude: 103.955574 });
                 return;
             }
 
@@ -207,8 +282,8 @@ const GeolocationModule = {
                 },
                 (error) => {
                     console.warn('Geolocation error:', error);
-                    // Fallback to default location (Santa Monica Beach)
-                    resolve({ latitude: 34.0195, longitude: -118.4912 });
+                    // Fallback to Pasir Ris Beach
+                    resolve({ latitude: 1.381497, longitude: 103.955574 });
                 },
                 CONFIG.geolocation
             );
@@ -347,18 +422,28 @@ const App = {
         CrewModule.displayCrew();
         EventsModule.displayEvents();
 
-        // Fetch and display weather
+        // Fetch and display weather from NEA
         try {
-            const location = await GeolocationModule.getCurrentLocation();
-            console.log('📍 Location obtained:', location);
+            console.log('📍 Fetching weather from NEA...');
+            
+            // Fetch 4-day forecast
+            const forecast = await WeatherModule.fetchWeather();
+            if (forecast) {
+                WeatherModule.displayWeather(forecast);
+            }
 
-            const weather = await WeatherModule.fetchWeather(location.latitude, location.longitude);
-            WeatherModule.displayWeather(weather);
+            // Fetch current 2-hour forecast
+            const current = await WeatherModule.fetch2HourForecast();
+            if (current && forecast) {
+                WeatherModule.displayCurrentWeather(current);
+            }
         } catch (error) {
             console.error('App initialization error:', error);
-            // Fetch weather for default location
-            const weather = await WeatherModule.fetchWeather(34.0195, -118.4912);
-            WeatherModule.displayWeather(weather, 'Santa Monica Beach');
+            document.getElementById('weatherContainer').innerHTML = `
+                <div class="weather-card" style="grid-column: 1/-1;">
+                    <p>⚠️ Weather data currently unavailable. Check back soon!</p>
+                </div>
+            `;
         }
 
         console.log('✅ ShoreSquad App Ready!');

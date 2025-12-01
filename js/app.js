@@ -416,32 +416,6 @@ const WeatherModule = {
             const forecast = currentForecast?.forecast || 'Fair';
             const emoji = this.getWeatherEmoji(forecast);
             
-            // 2-hour forecast has scalar values, not ranges
-            let temp = 'N/A';
-            let humidity = 'N/A';
-            let windSpeed = 'N/A';
-
-            if (currentForecast?.temperature !== undefined && currentForecast.temperature !== null) {
-                const tempVal = Number(currentForecast.temperature);
-                if (!isNaN(tempVal)) {
-                    temp = `${tempVal.toFixed(1)}°C`;
-                }
-            }
-
-            if (currentForecast?.relative_humidity !== undefined && currentForecast.relative_humidity !== null) {
-                const humidityVal = Number(currentForecast.relative_humidity);
-                if (!isNaN(humidityVal)) {
-                    humidity = `${humidityVal.toFixed(0)}%`;
-                }
-            }
-
-            if (currentForecast?.wind_speed !== undefined && currentForecast.wind_speed !== null) {
-                const windVal = Number(currentForecast.wind_speed);
-                if (!isNaN(windVal)) {
-                    windSpeed = `${windVal.toFixed(1)} km/h`;
-                }
-            }
-            
             const updateTime = current.update_timestamp 
                 ? new Date(current.update_timestamp).toLocaleTimeString('en-SG', { 
                     hour: '2-digit', 
@@ -455,10 +429,7 @@ const WeatherModule = {
                     <p style="font-size: 1.8rem; margin: 0.5rem 0;">
                         ${emoji} ${forecast}
                     </p>
-                    <p><strong>Temperature:</strong> ${temp}</p>
-                    <p><strong>Humidity:</strong> ${humidity}</p>
-                    <p><strong>Wind Speed:</strong> ${windSpeed}</p>
-                    <p style="font-size: 0.85rem; margin-top: 0.5rem;"><strong>Updated:</strong> ${updateTime}</p>
+                    <p><strong>Updated:</strong> ${updateTime}</p>
                 </div>
             `;
 

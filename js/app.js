@@ -96,56 +96,87 @@ const CacheManager = {
 
 const WeatherModule = {
     /**
-     * Fetch 4-day weather forecast from NEA
+     * Fetch 4-day weather forecast from NEA with timeout
      */
     async fetchWeather() {
         const cacheKey = 'weather_forecast_nea';
         const cached = CacheManager.get(cacheKey);
 
         if (cached) {
-            console.log('Using cached weather data');
+            console.log('Using cached 4-day weather data');
             return cached;
         }
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.API.timeout);
+
             const response = await fetch(CONFIG.API.weatherFull, {
-                signal: AbortSignal.timeout(CONFIG.API.timeout),
+                signal: controller.signal,
             });
 
-            if (!response.ok) throw new Error('Weather API error');
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                console.warn(`Weather API returned status ${response.status}`);
+                return null;
+            }
 
             const data = await response.json();
+            
+            // Validate structure
+            if (!data || typeof data !== 'object') {
+                console.warn('Invalid weather data structure');
+                return null;
+            }
+
             CacheManager.set(cacheKey, data);
             return data;
         } catch (error) {
-            console.error('Weather fetch failed:', error);
+            console.error('4-day forecast fetch failed:', error.message);
             return null;
         }
     },
 
     /**
-     * Fetch 2-hour forecast from NEA
+     * Fetch 2-hour forecast from NEA with timeout
      */
     async fetch2HourForecast() {
         const cacheKey = 'weather_2hour_nea';
         const cached = CacheManager.get(cacheKey);
 
         if (cached) {
+            console.log('Using cached 2-hour weather data');
             return cached;
         }
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.API.timeout);
+
             const response = await fetch(CONFIG.API.weather, {
-                signal: AbortSignal.timeout(CONFIG.API.timeout),
+                signal: controller.signal,
             });
 
-            if (!response.ok) throw new Error('2-hour forecast API error');
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                console.warn(`2-hour forecast API returned status ${response.status}`);
+                return null;
+            }
 
             const data = await response.json();
+
+            // Validate structure
+            if (!data || typeof data !== 'object') {
+                console.warn('Invalid 2-hour forecast data structure');
+                return null;
+            }
+
             CacheManager.set(cacheKey, data);
             return data;
         } catch (error) {
-            console.error('2-hour forecast fetch failed:', error);
+            console.error('2-hour forecast fetch failed:', error.message);
             return null;
         }
     },
@@ -154,13 +185,16 @@ const WeatherModule = {
      * Get weather emoji/icon based on forecast text
      */
     getWeatherEmoji(forecastText) {
-        const text = forecastText.toLowerCase();
+        if (!forecastText) return '🌤️';
+        
+        const text = String(forecastText).toLowerCase();
         if (text.includes('rain') || text.includes('thunderstorm')) return '🌧️';
-        if (text.includes('cloudy')) return '☁️';
-        if (text.includes('clear') || text.includes('sunny')) return '☀️';
+        if (text.includes('thundery')) return '⛈️';
+        if (text.includes('showers')) return '🌧️';
+        if (text.includes('cloudy') || text.includes('overcast')) return '☁️';
+        if (text.includes('clear') || text.includes('sunny') || text.includes('fair')) return '☀️';
         if (text.includes('partly')) return '⛅';
         if (text.includes('fog')) return '🌫️';
-        if (text.includes('showers')) return '⛈️';
         return '🌤️';
     },
 
@@ -168,94 +202,218 @@ const WeatherModule = {
      * Format date for display
      */
     formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-SG', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-        });
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) {
+                return 'Unknown Date';
+            }
+            return date.toLocaleDateString('en-SG', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+            });
+        } catch (error) {
+            console.warn('Date formatting failed:', error);
+            return 'Unknown Date';
+        }
     },
 
     /**
      * Display 4-day forecast
      */
     displayWeather(data) {
-        if (!data || !data.items) {
-            document.getElementById('weatherContainer').innerHTML = `
+        const container = document.getElementById('weatherContainer');
+        
+        if (!container) {
+            console.warn('Weather container not found');
+            return;
+        }
+
+        if (!data || !Array.isArray(data.items) || data.items.length === 0) {
+            container.innerHTML = `
                 <div class="weather-card" style="grid-column: 1/-1;">
-                    <p>Unable to fetch weather data. Please check your connection.</p>
+                    <p>📊 Weather data temporarily unavailable. Try again later.</p>
                 </div>
             `;
             return;
         }
 
-        const forecastItems = data.items[0].forecast;
-        
-        // Group forecasts by date
-        const forecastByDate = {};
-        forecastItems.forEach((forecast) => {
-            const date = forecast.date;
-            if (!forecastByDate[date]) {
-                forecastByDate[date] = [];
-            }
-            forecastByDate[date].push(forecast);
-        });
-
-        // Create weather cards for first 4 days
-        const dates = Object.keys(forecastByDate).slice(0, 4);
-        const weatherHTML = dates
-            .map((date, index) => {
-                const dayForecasts = forecastByDate[date];
-                // Get average conditions and find min/max temps
-                const forecasts = dayForecasts.map((f) => f.forecast).join(', ');
-                const hasRain = forecasts.toLowerCase().includes('rain');
-                const conditions = new Set(dayForecasts.map((f) => f.forecast));
-                const primaryCondition = Array.from(conditions)[0] || 'Fair';
-                const emoji = this.getWeatherEmoji(primaryCondition);
-
-                return `
-                    <div class="weather-card">
-                        <h5>${this.formatDate(date)}</h5>
-                        <p style="font-size: 1.5rem; margin: 0.5rem 0;">
-                            ${emoji} ${primaryCondition}
-                        </p>
-                        <p><strong>Conditions:</strong> ${Array.from(conditions).join(', ')}</p>
-                        <p style="font-size: 0.9rem; color: #A0AEC0;">
-                            ${hasRain ? '⚠️ Bring rain gear' : '✅ Good cleanup weather'}
-                        </p>
+        try {
+            const forecastsArray = data.items[0]?.forecasts || [];
+            
+            if (forecastsArray.length === 0) {
+                container.innerHTML = `
+                    <div class="weather-card" style="grid-column: 1/-1;">
+                        <p>📊 No forecast data available.</p>
                     </div>
                 `;
-            })
-            .join('');
+                return;
+            }
 
-        document.getElementById('weatherContainer').innerHTML = weatherHTML;
+            // Group forecasts by date
+            const forecastByDate = {};
+            forecastsArray.forEach((forecast) => {
+                if (!forecast || !forecast.date) return;
+                
+                const date = String(forecast.date).trim();
+                if (!forecastByDate[date]) {
+                    forecastByDate[date] = [];
+                }
+                forecastByDate[date].push(forecast);
+            });
+
+            // Get unique dates (limit to 4 days)
+            const dates = Object.keys(forecastByDate).slice(0, 4);
+
+            if (dates.length === 0) {
+                container.innerHTML = `
+                    <div class="weather-card" style="grid-column: 1/-1;">
+                        <p>📊 No date information in forecast.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Create weather cards
+            const weatherHTML = dates
+                .map((date) => {
+                    const dayForecasts = forecastByDate[date] || [];
+                    const forecastTexts = dayForecasts
+                        .map((f) => f.forecast)
+                        .filter(Boolean);
+                    
+                    // Extract temperature, humidity, and wind data
+                    const temps = dayForecasts
+                        .map((f) => f.temperature)
+                        .filter((t) => t !== undefined && t !== null)
+                        .map(Number)
+                        .filter((t) => !isNaN(t));
+                    
+                    const humidities = dayForecasts
+                        .map((f) => f.relative_humidity)
+                        .filter((h) => h !== undefined && h !== null)
+                        .map(Number)
+                        .filter((h) => !isNaN(h));
+                    
+                    const winds = dayForecasts
+                        .map((f) => f.wind_speed)
+                        .filter((w) => w !== undefined && w !== null)
+                        .map(Number)
+                        .filter((w) => !isNaN(w));
+
+                    const avgTemp = temps.length > 0 
+                        ? (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1)
+                        : 'N/A';
+                    const highTemp = temps.length > 0 ? Math.max(...temps).toFixed(1) : 'N/A';
+                    const lowTemp = temps.length > 0 ? Math.min(...temps).toFixed(1) : 'N/A';
+                    const avgHumidity = humidities.length > 0
+                        ? (humidities.reduce((a, b) => a + b, 0) / humidities.length).toFixed(0)
+                        : 'N/A';
+                    const avgWind = winds.length > 0
+                        ? (winds.reduce((a, b) => a + b, 0) / winds.length).toFixed(1)
+                        : 'N/A';
+
+                    const conditions = new Set(forecastTexts);
+                    const primaryCondition = Array.from(conditions)[0] || 'Fair';
+                    const hasRain = Array.from(conditions).some((c) =>
+                        String(c).toLowerCase().includes('rain')
+                    );
+                    const emoji = this.getWeatherEmoji(primaryCondition);
+
+                    return `
+                        <div class="weather-card">
+                            <h5>${this.formatDate(date)}</h5>
+                            <p style="font-size: 1.5rem; margin: 0.5rem 0;">
+                                ${emoji} ${primaryCondition}
+                            </p>
+                            <p><strong>Temperature:</strong> ${avgTemp}°C (H: ${highTemp}°C / L: ${lowTemp}°C)</p>
+                            <p><strong>Humidity:</strong> ${avgHumidity}%</p>
+                            <p><strong>Wind Speed:</strong> ${avgWind} km/h</p>
+                            <p><strong>Conditions:</strong> ${Array.from(conditions).slice(0, 2).join(', ') || 'Fair'}</p>
+                            <p style="font-size: 0.9rem; color: #A0AEC0;">
+                                ${hasRain ? '⚠️ Bring rain gear' : '✅ Good cleanup weather'}
+                            </p>
+                        </div>
+                    `;
+                })
+                .join('');
+
+            container.innerHTML = weatherHTML;
+        } catch (error) {
+            console.error('Error displaying 4-day forecast:', error);
+            container.innerHTML = `
+                <div class="weather-card" style="grid-column: 1/-1;">
+                    <p>⚠️ Error loading forecast. Please refresh.</p>
+                </div>
+            `;
+        }
     },
 
     /**
      * Display 2-hour forecast as current conditions
      */
     displayCurrentWeather(data) {
-        if (!data || !data.items) {
+        const container = document.getElementById('weatherContainer');
+        
+        if (!container || !data) {
             return;
         }
 
-        const current = data.items[0];
-        const forecast = current.forecasts[0]?.forecast || 'Fair';
-        const emoji = this.getWeatherEmoji(forecast);
+        try {
+            const items = Array.isArray(data.items) ? data.items : [];
+            if (items.length === 0) {
+                return;
+            }
 
-        const currentHTML = `
-            <div class="weather-card" style="grid-column: 1/-1; background: linear-gradient(135deg, #00D4AA 0%, #0099CC 100%); color: white;">
-                <h5>Current Conditions (Next 2 Hours)</h5>
-                <p style="font-size: 1.8rem; margin: 0.5rem 0;">
-                    ${emoji} ${forecast}
-                </p>
-                <p><strong>Last Updated:</strong> ${new Date(current.update_timestamp).toLocaleTimeString('en-SG')}</p>
-            </div>
-        `;
+            const current = items[0];
+            const forecasts = Array.isArray(current.forecasts) ? current.forecasts : [];
+            
+            if (forecasts.length === 0) {
+                return;
+            }
 
-        // Insert at the beginning of weather container
-        const container = document.getElementById('weatherContainer');
-        container.innerHTML = currentHTML + container.innerHTML;
+            const currentForecast = forecasts[0];
+            const forecast = currentForecast?.forecast || 'Fair';
+            const emoji = this.getWeatherEmoji(forecast);
+            
+            const temp = currentForecast?.temperature !== undefined 
+                ? `${currentForecast.temperature.toFixed(1)}°C` 
+                : 'N/A';
+            
+            const humidity = currentForecast?.relative_humidity !== undefined 
+                ? `${currentForecast.relative_humidity.toFixed(0)}%` 
+                : 'N/A';
+            
+            const windSpeed = currentForecast?.wind_speed !== undefined 
+                ? `${currentForecast.wind_speed.toFixed(1)} km/h` 
+                : 'N/A';
+            
+            const updateTime = current.update_timestamp 
+                ? new Date(current.update_timestamp).toLocaleTimeString('en-SG', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                })
+                : 'Just now';
+
+            const currentHTML = `
+                <div class="weather-card" style="grid-column: 1/-1; background: linear-gradient(135deg, #00D4AA 0%, #0099CC 100%); color: white;">
+                    <h5>Current Conditions (Next 2 Hours)</h5>
+                    <p style="font-size: 1.8rem; margin: 0.5rem 0;">
+                        ${emoji} ${forecast}
+                    </p>
+                    <p><strong>Temperature:</strong> ${temp}</p>
+                    <p><strong>Humidity:</strong> ${humidity}</p>
+                    <p><strong>Wind Speed:</strong> ${windSpeed}</p>
+                    <p style="font-size: 0.85rem; margin-top: 0.5rem;"><strong>Updated:</strong> ${updateTime}</p>
+                </div>
+            `;
+
+            // Insert at the beginning
+            const existingHTML = container.innerHTML;
+            container.innerHTML = currentHTML + existingHTML;
+        } catch (error) {
+            console.error('Error displaying current weather:', error);
+        }
     },
 };
 

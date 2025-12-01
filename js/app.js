@@ -282,35 +282,56 @@ const WeatherModule = {
                         .map((f) => f.forecast)
                         .filter(Boolean);
                     
-                    // Extract temperature, humidity, and wind data
-                    const temps = dayForecasts
-                        .map((f) => f.temperature)
-                        .filter((t) => t !== undefined && t !== null)
-                        .map(Number)
-                        .filter((t) => !isNaN(t));
-                    
-                    const humidities = dayForecasts
-                        .map((f) => f.relative_humidity)
-                        .filter((h) => h !== undefined && h !== null)
-                        .map(Number)
-                        .filter((h) => !isNaN(h));
-                    
-                    const winds = dayForecasts
-                        .map((f) => f.wind_speed)
-                        .filter((w) => w !== undefined && w !== null)
-                        .map(Number)
-                        .filter((w) => !isNaN(w));
+                    // Extract temperature ranges (NEA returns {low, high} objects)
+                    const tempLows = [];
+                    const tempHighs = [];
+                    dayForecasts.forEach((f) => {
+                        if (f.temperature && typeof f.temperature === 'object') {
+                            if (f.temperature.low !== undefined) tempLows.push(f.temperature.low);
+                            if (f.temperature.high !== undefined) tempHighs.push(f.temperature.high);
+                        }
+                    });
 
-                    const avgTemp = temps.length > 0 
-                        ? (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1)
+                    // Extract humidity ranges
+                    const humidityLows = [];
+                    const humidityHighs = [];
+                    dayForecasts.forEach((f) => {
+                        if (f.relative_humidity && typeof f.relative_humidity === 'object') {
+                            if (f.relative_humidity.low !== undefined) humidityLows.push(f.relative_humidity.low);
+                            if (f.relative_humidity.high !== undefined) humidityHighs.push(f.relative_humidity.high);
+                        }
+                    });
+
+                    // Extract wind ranges
+                    const windLows = [];
+                    const windHighs = [];
+                    dayForecasts.forEach((f) => {
+                        if (f.wind && typeof f.wind === 'object') {
+                            if (f.wind.low !== undefined) windLows.push(f.wind.low);
+                            if (f.wind.high !== undefined) windHighs.push(f.wind.high);
+                        }
+                    });
+
+                    // Calculate averages and ranges
+                    const avgTempLow = tempLows.length > 0 
+                        ? (tempLows.reduce((a, b) => a + b, 0) / tempLows.length).toFixed(1)
                         : 'N/A';
-                    const highTemp = temps.length > 0 ? Math.max(...temps).toFixed(1) : 'N/A';
-                    const lowTemp = temps.length > 0 ? Math.min(...temps).toFixed(1) : 'N/A';
-                    const avgHumidity = humidities.length > 0
-                        ? (humidities.reduce((a, b) => a + b, 0) / humidities.length).toFixed(0)
+                    const avgTempHigh = tempHighs.length > 0
+                        ? (tempHighs.reduce((a, b) => a + b, 0) / tempHighs.length).toFixed(1)
                         : 'N/A';
-                    const avgWind = winds.length > 0
-                        ? (winds.reduce((a, b) => a + b, 0) / winds.length).toFixed(1)
+                    
+                    const avgHumidityLow = humidityLows.length > 0
+                        ? (humidityLows.reduce((a, b) => a + b, 0) / humidityLows.length).toFixed(0)
+                        : 'N/A';
+                    const avgHumidityHigh = humidityHighs.length > 0
+                        ? (humidityHighs.reduce((a, b) => a + b, 0) / humidityHighs.length).toFixed(0)
+                        : 'N/A';
+                    
+                    const avgWindLow = windLows.length > 0
+                        ? (windLows.reduce((a, b) => a + b, 0) / windLows.length).toFixed(1)
+                        : 'N/A';
+                    const avgWindHigh = windHighs.length > 0
+                        ? (windHighs.reduce((a, b) => a + b, 0) / windHighs.length).toFixed(1)
                         : 'N/A';
 
                     const conditions = new Set(forecastTexts);
@@ -326,9 +347,9 @@ const WeatherModule = {
                             <p style="font-size: 1.5rem; margin: 0.5rem 0;">
                                 ${emoji} ${primaryCondition}
                             </p>
-                            <p><strong>Temperature:</strong> ${avgTemp}°C (H: ${highTemp}°C / L: ${lowTemp}°C)</p>
-                            <p><strong>Humidity:</strong> ${avgHumidity}%</p>
-                            <p><strong>Wind Speed:</strong> ${avgWind} km/h</p>
+                            <p><strong>Temperature:</strong> ${avgTempLow}°C - ${avgTempHigh}°C</p>
+                            <p><strong>Humidity:</strong> ${avgHumidityLow}% - ${avgHumidityHigh}%</p>
+                            <p><strong>Wind Speed:</strong> ${avgWindLow} - ${avgWindHigh} km/h</p>
                             <p><strong>Conditions:</strong> ${Array.from(conditions).slice(0, 2).join(', ') || 'Fair'}</p>
                             <p style="font-size: 0.9rem; color: #A0AEC0;">
                                 ${hasRain ? '⚠️ Bring rain gear' : '✅ Good cleanup weather'}

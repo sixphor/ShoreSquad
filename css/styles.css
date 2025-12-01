@@ -134,6 +134,7 @@ a:hover {
     margin: 0;
     font-size: 1.75rem;
     color: var(--primary);
+    font-weight: 800;
 }
 
 .nav-menu {
@@ -145,9 +146,10 @@ a:hover {
 
 .nav-link {
     color: var(--text-dark);
-    font-weight: 500;
+    font-weight: 700;
     transition: color var(--transition-fast);
     position: relative;
+    font-size: 1rem;
 }
 
 .nav-link::after {
@@ -156,9 +158,13 @@ a:hover {
     bottom: -5px;
     left: 0;
     width: 0;
-    height: 2px;
-    background-color: var(--secondary);
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
     transition: width var(--transition-base);
+}
+
+.nav-link:hover {
+    color: var(--primary);
 }
 
 .nav-link:hover::after {
@@ -277,32 +283,37 @@ a:hover {
 
 .map-placeholder {
     background-color: var(--bg-white);
-    border: 2px dashed var(--border-color);
+    border: 3px solid var(--primary);
     border-radius: var(--radius-lg);
     display: flex;
     flex-direction: column;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
 }
 
 .map-placeholder iframe {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    filter: brightness(0.95) contrast(1.05);
 }
 
 .map-info {
     padding: var(--spacing-lg);
-    background-color: var(--bg-white);
-    border-top: 1px solid var(--border-color);
+    background: linear-gradient(135deg, #F8F9FA 0%, #E8EAEF 100%);
+    border-top: 2px solid var(--primary);
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 .map-info h4 {
     color: var(--primary);
     margin-bottom: var(--spacing-md);
+    font-size: 1.25rem;
 }
 
 .map-info p {
     margin-bottom: var(--spacing-sm);
     font-size: 0.95rem;
+    color: var(--text-dark);
+    font-weight: 500;
 }
 
 /* ============================================
@@ -585,6 +596,19 @@ button:focus {
         color: #e0e0e0;
     }
 
+    .navbar {
+        background-color: #2d2d2d;
+        border-bottom: 2px solid var(--primary);
+    }
+
+    .nav-link {
+        color: #e0e0e0;
+    }
+
+    .nav-link:hover {
+        color: var(--secondary);
+    }
+
     .navbar,
     .map-placeholder,
     .weather-card,
@@ -594,7 +618,38 @@ button:focus {
     }
 
     .map-placeholder {
-        border-color: #444;
-        color: #999;
+        border-color: var(--primary);
+        background-color: #2d2d2d;
+    }
+
+    .map-placeholder iframe {
+        filter: brightness(0.85) contrast(1.15);
+    }
+
+    .map-info {
+        background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+        border-top-color: var(--secondary);
+    }
+
+    .map-info h4 {
+        color: var(--secondary);
+    }
+
+    .map-info p {
+        color: #e0e0e0;
+    }
+
+    .weather-card h5 {
+        color: var(--secondary);
+    }
+
+    .weather-card p,
+    .crew-card p,
+    .event-card p {
+        color: #d0d0d0;
+    }
+
+    .event-card h4 {
+        color: var(--accent);
     }
 }

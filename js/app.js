@@ -424,7 +424,7 @@ const WeatherModule = {
 
             const currentHTML = `
                 <div class="weather-card" style="grid-column: 1/-1; background: linear-gradient(135deg, #00D4AA 0%, #0099CC 100%); color: white;">
-                    <h5>Current Conditions (Next 2 Hours)</h5>
+                    <h5 style="color: white; margin-bottom: var(--spacing-md);">Current Conditions (Next 2 Hours)</h5>
                     <p style="font-size: 1.8rem; margin: 0.5rem 0;">
                         ${emoji} ${forecast}
                     </p>

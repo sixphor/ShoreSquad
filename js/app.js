@@ -287,8 +287,12 @@ const WeatherModule = {
                     const tempHighs = [];
                     dayForecasts.forEach((f) => {
                         if (f.temperature && typeof f.temperature === 'object') {
-                            if (f.temperature.low !== undefined) tempLows.push(f.temperature.low);
-                            if (f.temperature.high !== undefined) tempHighs.push(f.temperature.high);
+                            if (f.temperature.low !== undefined && f.temperature.low !== null) {
+                                tempLows.push(Number(f.temperature.low));
+                            }
+                            if (f.temperature.high !== undefined && f.temperature.high !== null) {
+                                tempHighs.push(Number(f.temperature.high));
+                            }
                         }
                     });
 
@@ -297,8 +301,12 @@ const WeatherModule = {
                     const humidityHighs = [];
                     dayForecasts.forEach((f) => {
                         if (f.relative_humidity && typeof f.relative_humidity === 'object') {
-                            if (f.relative_humidity.low !== undefined) humidityLows.push(f.relative_humidity.low);
-                            if (f.relative_humidity.high !== undefined) humidityHighs.push(f.relative_humidity.high);
+                            if (f.relative_humidity.low !== undefined && f.relative_humidity.low !== null) {
+                                humidityLows.push(Number(f.relative_humidity.low));
+                            }
+                            if (f.relative_humidity.high !== undefined && f.relative_humidity.high !== null) {
+                                humidityHighs.push(Number(f.relative_humidity.high));
+                            }
                         }
                     });
 
@@ -307,32 +315,43 @@ const WeatherModule = {
                     const windHighs = [];
                     dayForecasts.forEach((f) => {
                         if (f.wind && typeof f.wind === 'object') {
-                            if (f.wind.low !== undefined) windLows.push(f.wind.low);
-                            if (f.wind.high !== undefined) windHighs.push(f.wind.high);
+                            if (f.wind.low !== undefined && f.wind.low !== null) {
+                                windLows.push(Number(f.wind.low));
+                            }
+                            if (f.wind.high !== undefined && f.wind.high !== null) {
+                                windHighs.push(Number(f.wind.high));
+                            }
                         }
                     });
 
-                    // Calculate averages and ranges
-                    const avgTempLow = tempLows.length > 0 
-                        ? (tempLows.reduce((a, b) => a + b, 0) / tempLows.length).toFixed(1)
-                        : 'N/A';
-                    const avgTempHigh = tempHighs.length > 0
-                        ? (tempHighs.reduce((a, b) => a + b, 0) / tempHighs.length).toFixed(1)
-                        : 'N/A';
+                    // Calculate ranges, filter out NaN values
+                    const validTempLows = tempLows.filter(t => !isNaN(t));
+                    const validTempHighs = tempHighs.filter(t => !isNaN(t));
+                    const validHumidityLows = humidityLows.filter(h => !isNaN(h));
+                    const validHumidityHighs = humidityHighs.filter(h => !isNaN(h));
+                    const validWindLows = windLows.filter(w => !isNaN(w));
+                    const validWindHighs = windHighs.filter(w => !isNaN(w));
+
+                    const avgTempLow = validTempLows.length > 0 
+                        ? (validTempLows.reduce((a, b) => a + b, 0) / validTempLows.length).toFixed(1)
+                        : '--';
+                    const avgTempHigh = validTempHighs.length > 0
+                        ? (validTempHighs.reduce((a, b) => a + b, 0) / validTempHighs.length).toFixed(1)
+                        : '--';
                     
-                    const avgHumidityLow = humidityLows.length > 0
-                        ? (humidityLows.reduce((a, b) => a + b, 0) / humidityLows.length).toFixed(0)
-                        : 'N/A';
-                    const avgHumidityHigh = humidityHighs.length > 0
-                        ? (humidityHighs.reduce((a, b) => a + b, 0) / humidityHighs.length).toFixed(0)
-                        : 'N/A';
+                    const avgHumidityLow = validHumidityLows.length > 0
+                        ? (validHumidityLows.reduce((a, b) => a + b, 0) / validHumidityLows.length).toFixed(0)
+                        : '--';
+                    const avgHumidityHigh = validHumidityHighs.length > 0
+                        ? (validHumidityHighs.reduce((a, b) => a + b, 0) / validHumidityHighs.length).toFixed(0)
+                        : '--';
                     
-                    const avgWindLow = windLows.length > 0
-                        ? (windLows.reduce((a, b) => a + b, 0) / windLows.length).toFixed(1)
-                        : 'N/A';
-                    const avgWindHigh = windHighs.length > 0
-                        ? (windHighs.reduce((a, b) => a + b, 0) / windHighs.length).toFixed(1)
-                        : 'N/A';
+                    const avgWindLow = validWindLows.length > 0
+                        ? (validWindLows.reduce((a, b) => a + b, 0) / validWindLows.length).toFixed(1)
+                        : '--';
+                    const avgWindHigh = validWindHighs.length > 0
+                        ? (validWindHighs.reduce((a, b) => a + b, 0) / validWindHighs.length).toFixed(1)
+                        : '--';
 
                     const conditions = new Set(forecastTexts);
                     const primaryCondition = Array.from(conditions)[0] || 'Fair';
@@ -397,17 +416,31 @@ const WeatherModule = {
             const forecast = currentForecast?.forecast || 'Fair';
             const emoji = this.getWeatherEmoji(forecast);
             
-            const temp = currentForecast?.temperature !== undefined 
-                ? `${currentForecast.temperature.toFixed(1)}°C` 
-                : 'N/A';
-            
-            const humidity = currentForecast?.relative_humidity !== undefined 
-                ? `${currentForecast.relative_humidity.toFixed(0)}%` 
-                : 'N/A';
-            
-            const windSpeed = currentForecast?.wind_speed !== undefined 
-                ? `${currentForecast.wind_speed.toFixed(1)} km/h` 
-                : 'N/A';
+            // 2-hour forecast has scalar values, not ranges
+            let temp = 'N/A';
+            let humidity = 'N/A';
+            let windSpeed = 'N/A';
+
+            if (currentForecast?.temperature !== undefined && currentForecast.temperature !== null) {
+                const tempVal = Number(currentForecast.temperature);
+                if (!isNaN(tempVal)) {
+                    temp = `${tempVal.toFixed(1)}°C`;
+                }
+            }
+
+            if (currentForecast?.relative_humidity !== undefined && currentForecast.relative_humidity !== null) {
+                const humidityVal = Number(currentForecast.relative_humidity);
+                if (!isNaN(humidityVal)) {
+                    humidity = `${humidityVal.toFixed(0)}%`;
+                }
+            }
+
+            if (currentForecast?.wind_speed !== undefined && currentForecast.wind_speed !== null) {
+                const windVal = Number(currentForecast.wind_speed);
+                if (!isNaN(windVal)) {
+                    windSpeed = `${windVal.toFixed(1)} km/h`;
+                }
+            }
             
             const updateTime = current.update_timestamp 
                 ? new Date(current.update_timestamp).toLocaleTimeString('en-SG', { 

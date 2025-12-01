@@ -368,7 +368,6 @@ const WeatherModule = {
                             </p>
                             <p><strong>Temperature:</strong> ${avgTempLow}°C - ${avgTempHigh}°C</p>
                             <p><strong>Humidity:</strong> ${avgHumidityLow}% - ${avgHumidityHigh}%</p>
-                            <p><strong>Wind Speed:</strong> ${avgWindLow} - ${avgWindHigh} km/h</p>
                             <p><strong>Conditions:</strong> ${Array.from(conditions).slice(0, 2).join(', ') || 'Fair'}</p>
                             <p style="font-size: 0.9rem; color: #A0AEC0;">
                                 ${hasRain ? '⚠️ Bring rain gear' : '✅ Good cleanup weather'}
